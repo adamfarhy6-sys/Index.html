@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CineExplain — Interactive Movie Guide</title>
+  <style>
+    :root {
+      --bg: #0a0b0e;
+      --surface: #12141a;
+      --surface2: #1a1d26;
+      --border: #2a2d3a;
+      --accent: #e8b84b;
+      --accent2: #7c6af5;
+      --text: #e8e9ef;
+      --muted: #6b7080;
+      --danger: #e85454;
+      --success: #4be87a;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Layout ── */
+    #app { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 280px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #sidebar-header {
+      padding: 24px 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #sidebar-header h1 {
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, var(--accent), #ff9a4a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    #sidebar-header p {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 3px;
+      letter-spacing: 0.5px;
+    }
+
+    #search-box {
+      margin: 14px 16px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      gap: 8px;
+    }
+
+    #search-box input {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 0.85rem;
+      width: 100%;
+      outline: none;
+    }
+
+    #search-box input::placeholder { color: var(--muted); }
+    #search-icon { color: var(--muted); font-size: 0.9rem; }
+
+    #genre-filters {
+      display: flex;
+      gap: 6px;
+      padding: 0 16px 10px;
+      flex-wrap: wrap;
+    }
+
+    .genre-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.7rem;
+      padding: 4px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.3px;
+    }
+
+    .genre-chip.active, .genre-chip:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+    }
+
+    #movie-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px 16px;
+    }
+
+    #movie-list::-webkit-scrollbar { width: 4px; }
+    #movie-list::-webkit-scrollbar-track { background: transparent; }
+    #movie-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .movie-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 2px;
+    }
+
+    .movie-card:hover { background: var(--surface2); }
+    .movie-card.active { background: rgba(232, 184, 75, 0.12); border: 1px solid rgba(232, 184, 75, 0.3); }
+
+    .movie-poster-thumb {
+      width: 42px;
+      height: 60px;
+      border-radius: 6px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .movie-card-info { flex: 1; min-width: 0; }
+    .movie-card-title { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .movie-card-meta { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+    .movie-card-rating {
+      font-size: 0.72rem;
+      color: var(--accent);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* ── Main Content ── */
+    #main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    #main::-webkit-scrollbar { width: 6px; }
+    #main::-webkit-scrollbar-track { background: transparent; }
+    #main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Hero ── */
+    #hero {
+      position: relative;
+      min-height: 280px;
+      display: flex;
+      align-items: flex-end;
+      padding: 32px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    #hero-bg {
+      position: absolute;
+      inset: 0;
+      transition: background 0.6s;
+    }
+
+    #hero-grad {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, var(--bg) 0%, rgba(10,11,14,0.6) 50%, transparent 100%);
+    }
+
+    #hero-content { position: relative; z-index: 1; width: 100%; }
+
+    #movie-emoji {
+      font-size: 3.5rem;
+      margin-bottom: 12px;
+      display: block;
+      filter: drop-shadow(0 4px 16px rgba(0,0,0,0.6));
+    }
+
+    #movie-title {
+      font-size: 2.6rem;
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    #movie-tagline {
+      color: var(--accent);
+      font-size: 0.9rem;
+      font-style: italic;
+      margin-bottom: 14px;
+      opacity: 0.9;
+    }
+
+    #movie-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .badge {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.72rem;
+      letter-spacing: 0.3px;
+    }
+
+    .badge.rating { background: rgba(232,184,75,0.15); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+    .badge.genre { color: var(--muted); }
+
+    #spoiler-toggle {
+      margin-left: auto;
+      background: rgba(232, 84, 84, 0.15);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    #spoiler-toggle:hover { background: rgba(232,84,84,0.25); }
+    #spoiler-toggle.revealed { background: rgba(232,84,84,0.3); }
+
+    /* ── Tabs ── */
+    #tabs-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      padding: 14px 18px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Tab Panels ── */
+    .tab-panel { display: none; padding: 28px 32px 48px; animation: fadeIn 0.3s; }
+    .tab-panel.active { display: block; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    /* ── Section Headers ── */
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Plot Timeline ── */
+    #plot-summary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 24px;
+      font-size: 0.88rem;
+      line-height: 1.75;
+      color: #c8cad4;
+      margin-bottom: 28px;
+    }
+
+    #timeline { position: relative; }
+
+    .timeline-item {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+
+    .timeline-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 48px;
+      flex-shrink: 0;
+    }
+
+    .timeline-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface2);
+      transition: all 0.2s;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .timeline-line {
+      width: 2px;
+      flex: 1;
+      background: var(--border);
+      margin-top: 4px;
+      min-height: 16px;
+    }
+
+    .timeline-item:last-child .timeline-line { display: none; }
+
+    .timeline-content {
+      flex: 1;
+      padding-bottom: 20px;
+    }
+
+    .timeline-act {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .timeline-heading {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .timeline-expand-icon {
+      font-size: 0.7rem;
+      color: var(--muted);
+      transition: transform 0.2s;
+      margin-left: auto;
+    }
+
+    .timeline-item.open .timeline-expand-icon { transform: rotate(180deg); }
+
+    .timeline-body {
+      font-size: 0.83rem;
+      line-height: 1.7;
+      color: #9da0b0;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease, opacity 0.25s;
+      opacity: 0;
+    }
+
+    .timeline-item.open .timeline-body { max-height: 400px; opacity: 1; }
+
+    .spoiler-block {
+      display: inline;
+    }
+
+    .spoiler-text {
+      background: var(--danger);
+      color: var(--danger);
+      border-radius: 3px;
+      padding: 0 4px;
+      cursor: pointer;
+      transition: color 0.2s;
+      user-select: none;
+    }
+
+    .spoiler-text.revealed, body.spoilers-on .spoiler-text {
+      color: #fff;
+    }
+
+    /* ── Characters ── */
+    #characters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+
+    .char-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    .char-card:hover { border-color: var(--accent2); transform: translateY(-2px); }
+    .char-card.expanded { border-color: var(--accent2); background: var(--surface2); }
+
+    .char-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      margin-bottom: 12px;
+      border: 2px solid var(--border);
+    }
+
+    .char-name { font-size: 0.95rem; font-weight: 700; margin-bottom: 3px; }
+    .char-role { font-size: 0.72rem; color: var(--accent2); font-weight: 600; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .char-actor { font-size: 0.72rem; color: var(--muted); }
+
+    .char-detail {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      line-height: 1.65;
+      color: #9da0b0;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease, opacity 0.25s;
+      opacity: 0;
+    }
+
+    .char-card.expanded .char-detail { max-height: 300px; opacity: 1; }
+
+    .char-trait {
+      display: inline-block;
+      background: rgba(124, 106, 245, 0.12);
+      border: 1px solid rgba(124, 106, 245, 0.25);
+      color: var(--accent2);
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-top: 8px;
+      margin-right: 4px;
+    }
+
+    /* ── Themes ── */
+    .theme-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 14px;
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+    }
+
+    .theme-icon {
+      font-size: 2rem;
+      flex-shrink: 0;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface2);
+      border-radius: 12px;
+    }
+
+    .theme-content { flex: 1; }
+    .theme-name { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .theme-desc { font-size: 0.83rem; line-height: 1.7; color: #9da0b0; }
+
+    .theme-quote {
+      margin-top: 12px;
+      border-left: 3px solid var(--accent);
+      padding-left: 12px;
+      font-size: 0.82rem;
+      font-style: italic;
+      color: var(--accent);
+      opacity: 0.85;
+    }
+
+    /* ── Why Watch ── */
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .why-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .why-card-icon { font-size: 1.6rem; margin-bottom: 10px; }
+    .why-card-title { font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; }
+    .why-card-body { font-size: 0.8rem; line-height: 1.65; color: #9da0b0; }
+
+    .mood-meter {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 14px;
+    }
+
+    .mood-meter-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 16px; }
+
+    .mood-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .mood-label { font-size: 0.75rem; color: var(--muted); width: 90px; flex-shrink: 0; }
+
+    .mood-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .mood-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .mood-val { font-size: 0.72rem; color: var(--muted); width: 30px; text-align: right; }
+
+    /* ── Empty state ── */
+    #empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--muted);
+      padding: 60px 32px;
+    }
+
+    #empty-state .big-emoji { font-size: 4rem; }
+    #empty-state h2 { font-size: 1.2rem; color: var(--text); }
+    #empty-state p { font-size: 0.85rem; text-align: center; max-width: 340px; line-height: 1.6; }
+
+    /* ── Responsive ── */
+    @media (max-width: 680px) {
+      #app { flex-direction: column; height: auto; }
+      #sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      #movie-list { max-height: 200px; }
+      #main { overflow-y: visible; }
+      #hero { padding: 20px; min-height: 200px; }
+      #movie-title { font-size: 1.8rem; }
+      .tab-panel { padding: 20px 16px 40px; }
+      #tabs-bar { padding: 0 16px; overflow-x: auto; }
+    }
+
+    /* ── Transitions ── */
+    #hero-content { transition: opacity 0.3s; }
+    #hero-content.transitioning { opacity: 0; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ── Sidebar ── -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>🎬 CineExplain</h1>
+      <p>INTERACTIVE MOVIE GUIDE</p>
+    </div>
+
+    <div id="search-box">
+      <span id="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Search movies…">
+    </div>
+
+    <div id="genre-filters">
+      <div class="genre-chip active" data-genre="all">All</div>
+      <div class="genre-chip" data-genre="Crime">Crime</div>
+      <div class="genre-chip" data-genre="Sci-Fi">Sci-Fi</div>
+      <div class="genre-chip" data-genre="Drama">Drama</div>
+      <div class="genre-chip" data-genre="Thriller">Thriller</div>
+    </div>
+
+    <div id="movie-list"></div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div id="main">
+    <div id="empty-state">
+      <div class="big-emoji">🎥</div>
+      <h2>Pick a Movie</h2>
+      <p>Select any film from the list to explore its plot, characters, themes, and why it's worth watching — all in an interactive breakdown.</p>
+    </div>
+
+    <div id="movie-view" style="display:none; flex-direction:column; flex:1;">
+      <div id="hero">
+        <div id="hero-bg"></div>
+        <div id="hero-grad"></div>
+        <div id="hero-content">
+          <span id="movie-emoji"></span>
+          <div id="movie-title"></div>
+          <div id="movie-tagline"></div>
+          <div id="movie-badges">
+            <span class="badge rating" id="badge-rating"></span>
+            <span class="badge genre" id="badge-year"></span>
+            <span class="badge genre" id="badge-director"></span>
+            <span class="badge genre" id="badge-genre"></span>
+            <span class="badge genre" id="badge-runtime"></span>
+            <button id="spoiler-toggle">🔒 Spoilers Off</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabs-bar">
+        <div class="tab-btn active" data-tab="plot">📖 Plot</div>
+        <div class="tab-btn" data-tab="characters">👥 Characters</div>
+        <div class="tab-btn" data-tab="themes">💡 Themes</div>
+        <div class="tab-btn" data-tab="why">⭐ Why Watch</div>
+      </div>
+
+      <div id="tab-plot" class="tab-panel active">
+        <div class="section-title">Overview</div>
+        <div id="plot-summary"></div>
+        <div class="section-title">Story Timeline</div>
+        <div id="timeline"></div>
+      </div>
+
+      <div id="tab-characters" class="tab-panel">
+        <div class="section-title">Key Characters</div>
+        <div id="characters-grid"></div>
+      </div>
+
+      <div id="tab-themes" class="tab-panel">
+        <div class="section-title">Central Themes</div>
+        <div id="themes-list"></div>
+      </div>
+
+      <div id="tab-why" class="tab-panel">
+        <div class="section-title">Reasons to Watch</div>
+        <div class="why-grid" id="why-grid"></div>
+        <div class="section-title">Mood & Tone</div>
+        <div class="mood-meter">
+          <div class="mood-meter-title">What to expect</div>
+          <div id="mood-bars"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  Movie Data
+// ─────────────────────────────────────────────
+const MOVIES = [
+  {
+    id: 'dark-knight',
+    title: 'The Dark Knight',
+    year: 2008,
+    director: 'Christopher Nolan',
+    genre: 'Crime / Thriller',
+    genres: ['Crime', 'Thriller'],
+    runtime: '152 min',
+    rating: '9.0',
+    emoji: '🦇',
+    tagline: '"Why so serious?"',
+    color1: '#1a1a2e',
+    color2: '#16213e',
+    summary: 'Set one year after Batman\'s debut, Gotham City faces its greatest threat yet — a psychopathic criminal mastermind calling himself The Joker. What begins as a war on organized crime spirals into a philosophical battle between order and chaos, forcing Bruce Wayne to question whether a vigilante hero can even exist in a moral world.',
+    timeline: [
+      { act: 'Act I', title: 'A New Threat Rises', icon: '🎭', body: 'The Joker announces himself by robbing a mob bank and killing his own crew. Gotham\'s organized crime is shaken. Batman, Lt. Gordon, and DA Harvey Dent form a triumvirate to clean up the city.' },
+      { act: 'Act I', title: 'Harvey Dent — Gotham\'s White Knight', icon: '⚖️', body: 'Harvey Dent is the legitimate face of justice Batman can never be. He pursues the mob openly while Bruce Wayne considers hanging up the cowl for good.' },
+      { act: 'Act II', title: 'The Joker\'s Game', icon: '🃏', body: 'The Joker offers the mob a deal: kill Batman, and he\'ll take half their money. He begins a city-wide campaign of terror, setting escalating ultimatums that force Batman to cross moral lines.' },
+      { act: 'Act II', title: 'Escalation & Chaos', icon: '💣', body: 'The Joker bombs hospitals and ferries, testing Gotham\'s citizens. Batman deploys city-wide sonar surveillance — a decision that troubles Lucius Fox. <span class="spoiler-text" onclick="revealSpoiler(this)">Harvey is captured and both he and Rachel are placed in separate warehouses rigged to explode. Batman saves Harvey; Gordon arrives too late for Rachel.</span>', spoiler: true },
+      { act: 'Act III', title: 'The Fall of the White Knight', icon: '🪙', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Harvey, disfigured and grief-stricken, becomes Two-Face — flipping a coin to dispense twisted "random" justice. He kills several people before Batman confronts him.</span>', spoiler: true },
+      { act: 'Act III', title: 'A Necessary Lie', icon: '🌃', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Batman takes the blame for Harvey\'s murders to preserve Dent\'s legacy as a symbol of hope. The Joker is imprisoned. Batman becomes a fugitive. "You either die a hero, or you live long enough to see yourself become the villain."</span>', spoiler: true },
+    ],
+    characters: [
+      { name: 'Bruce Wayne / Batman', role: 'Protagonist', actor: 'Christian Bale', emoji: '🦇', color: '#1a1a2e', traits: ['Conflicted', 'Driven', 'Sacrificial'], detail: 'A billionaire vigilante wrestling with whether his existence as Batman escalates the very chaos he fights. Nolan\'s Batman is less superhero, more tragic idealist — willing to sacrifice everything, including his own soul, to protect Gotham.' },
+      { name: 'The Joker', role: 'Antagonist', actor: 'Heath Ledger', emoji: '🎭', color: '#1f1010', traits: ['Chaotic', 'Philosophical', 'Unpredictable'], detail: 'An agent of chaos with no origin, no plan, and no demands beyond watching society tear itself apart. Heath Ledger\'s performance — physicality, improvised laughs, pencil tricks — is one of cinema\'s greatest. The Joker argues that all human civilization is one bad day away from barbarism.' },
+      { name: 'Harvey Dent / Two-Face', role: 'Tragic Hero', actor: 'Aaron Eckhart', emoji: '⚖️', color: '#0d1f2d', traits: ['Idealistic', 'Broken', 'Symmetrical'], detail: 'Gotham\'s "White Knight" — the legitimate hero Batman can never be. Harvey\'s fall into Two-Face is the Joker\'s real victory: proving that even the best of us can be corrupted. His coin is the film\'s darkest irony — randomness replacing the justice he once stood for.' },
+      { name: 'Alfred Pennyworth', role: 'Mentor', actor: 'Michael Caine', emoji: '🎩', color: '#1a1610', traits: ['Wise', 'Loyal', 'Honest'], detail: 'Alfred is Bruce\'s moral compass and emotional anchor. His story about burning the letter — choosing a kind lie over a painful truth — mirrors the film\'s ending perfectly.' },
+      { name: 'Lt. James Gordon', role: 'Ally', actor: 'Gary Oldman', emoji: '🚔', color: '#0a1628', traits: ['Incorruptible', 'Determined', 'Family Man'], detail: 'The one honest cop in a corrupt system. Gordon represents the ordinary person doing extraordinary things — no powers, no wealth, just integrity. His relationship with Batman is built entirely on trust without identity.' },
+      { name: 'Lucius Fox', role: 'Tech / Conscience', actor: 'Morgan Freeman', emoji: '🔬', color: '#101a10', traits: ['Principled', 'Genius', 'Reluctant'], detail: 'Lucius supplies Batman\'s gadgets but draws a moral line at the mass-surveillance sonar system — agreeing only if he can destroy it after one use. He embodies the film\'s question: does fighting evil justify using evil\'s tools?' },
+    ],
+    themes: [
+      { icon: '⚖️', name: 'Order vs. Chaos', quote: '"Some men just want to watch the world burn."', desc: 'The film\'s central conflict isn\'t Batman vs. Joker — it\'s civilization\'s order against pure nihilistic chaos. The Joker doesn\'t want money or power; he wants to prove that society\'s rules are a shared illusion that collapses under pressure.' },
+      { icon: '🪞', name: 'The Hero\'s Moral Compromise', quote: '"You either die a hero, or you live long enough to see yourself become the villain."', desc: 'Every choice Batman makes to stop the Joker requires sacrificing a moral principle — illegal surveillance, taking blame for murders. Nolan asks: can a hero remain heroic when fighting an enemy who plays by no rules?' },
+      { icon: '🎭', name: 'Identity & Masks', quote: '"Why so serious?"', desc: 'Batman wears a mask to protect his identity. Harvey wears a mask of righteousness. The Joker wears face paint — paradoxically the most "unmasked" of all. The film argues that identity is a performance, and chaos strips those masks away.' },
+      { icon: '🤝', name: 'Trust & Sacrifice', quote: '"A hero can be anyone."', desc: 'The ferry dilemma — two boats, each with a detonator for the other — is Nolan\'s most direct interrogation of human nature. Do ordinary people rise to goodness when truly tested? The film cautiously says yes, while refusing to be naive about it.' },
+    ],
+    why: [
+      { icon: '🎭', title: 'Heath Ledger\'s Legacy', body: 'A posthumous Oscar-winning performance so transformative it redefined what a comic book villain could be. Every scene he inhabits crackles with unpredictable energy.' },
+      { icon: '🧠', title: 'Philosophy Disguised as Action', body: 'Beneath the car chases and explosions is a rigorous debate about justice, ethics, and social contract theory. The film earns its 2.5-hour runtime.' },
+      { icon: '🎬', title: 'Cinematic Craft', body: 'Shot partially on IMAX, Hans Zimmer\'s two-note Joker theme, practical effects over CGI — this is filmmaking at its most deliberate and confident.' },
+      { icon: '😢', title: 'A Genuinely Tragic Ending', body: 'Most superhero films end in triumph. This one ends with a fugitive and a lie. The hero loses everything — and that choice makes Batman more heroic than any victory could.' },
+    ],
+    mood: [
+      { label: 'Tension', value: 95, color: '#e85454' },
+      { label: 'Darkness', value: 88, color: '#7c6af5' },
+      { label: 'Action', value: 72, color: '#e8b84b' },
+      { label: 'Emotion', value: 80, color: '#4be87a' },
+      { label: 'Humor', value: 18, color: '#4bb5e8' },
+    ],
+  },
+
+  {
+    id: 'inception',
+    title: 'Inception',
+    year: 2010,
+    director: 'Christopher Nolan',
+    genre: 'Sci-Fi / Thriller',
+    genres: ['Sci-Fi', 'Thriller'],
+    runtime: '148 min',
+    rating: '8.8',
+    emoji: '🌀',
+    tagline: '"Your mind is the scene of the crime."',
+    color1: '#0d1a2a',
+    color2: '#1a2a1a',
+    summary: 'Dom Cobb is a skilled thief who specializes in stealing secrets from people\'s dreams. Offered a chance to have his criminal record erased and return to his children, he must pull off an "inception" — planting an idea in someone\'s mind rather than stealing one. But the deeper they go, the more Cobb\'s own haunted subconscious bleeds into the mission.',
+    timeline: [
+      { act: 'Setup', title: 'Cobb — The Extractor', icon: '🌀', body: 'Dominic Cobb can enter shared dreams to steal industrial secrets. He\'s wanted in the US and can\'t return to his children. Saito, a Japanese businessman, offers him a deal: pull off inception on his rival Robert Fischer, and he walks free.' },
+      { act: 'Preparation', title: 'Assembling the Team', icon: '🧩', body: 'Cobb recruits Ariadne (architect), Eames (forger), Yusuf (chemist), and Arthur (point man). Ariadne discovers Cobb carries a projection of his dead wife Mal into every dream.' },
+      { act: 'The Heist', title: 'Three Layers Deep', icon: '🏨', body: 'The team enters Fischer\'s dream. Level 1: a rainy city. Level 2: a hotel corridor. Level 3: a snow fortress. Each deeper level runs on dilated time — minutes above become hours below. Gravity, physics, and reality warp.' },
+      { act: 'Conflict', title: 'Mal\'s Interference', icon: '👻', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Cobb\'s projection of his wife Mal sabotages the mission at every turn — she shoots Fischer, derails plans. Ariadne realizes Cobb cannot separate his guilt from reality. His limbo is the real threat.</span>', spoiler: true },
+      { act: 'Climax', title: 'Limbo — The Deepest Layer', icon: '🌊', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Saito and Cobb both fall into limbo — raw, infinite dream space. Cobb finally lets go of Mal\'s projection, accepting she is gone. He finds an aged Saito and convinces him to "take a leap of faith."</span>', spoiler: true },
+      { act: 'Resolution', title: 'The Spinning Top', icon: '🪀', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Cobb returns home and spins his totem — the top. He turns to embrace his children before seeing if it falls. The film cuts to black. Does it wobble? Is he dreaming? Nolan leaves it deliberately unresolved — the answer is less important than the fact that Cobb chooses reality.</span>', spoiler: true },
+    ],
+    characters: [
+      { name: 'Dom Cobb', role: 'Protagonist', actor: 'Leonardo DiCaprio', emoji: '🌀', color: '#0d1a2a', traits: ['Haunted', 'Brilliant', 'Guilt-Ridden'], detail: 'Cobb is a man who has spent so long in other people\'s dreams that he\'s lost the boundary between real and imagined. His real heist isn\'t Fischer\'s mind — it\'s his own: forgiving himself for Mal\'s death.' },
+      { name: 'Mal Cobb', role: 'Antagonist / Memory', actor: 'Marion Cotillard', emoji: '🌹', color: '#1a0d1a', traits: ['Seductive', 'Destructive', 'Tragic'], detail: 'Mal exists only as a projection in Cobb\'s subconscious — his unresolved grief and guilt given form. She was the first person to be incepted: Cobb planted the idea that her world wasn\'t real, and she died trying to "wake up."' },
+      { name: 'Ariadne', role: 'Architect / Conscience', actor: 'Elliot Page', emoji: '📐', color: '#0a1a0a', traits: ['Curious', 'Moral', 'Perceptive'], detail: 'Named after the mythological maze-builder. As the audience surrogate, she learns the rules of dream extraction — and uncovers Cobb\'s dangerous secret. She becomes the story\'s moral compass.' },
+      { name: 'Arthur', role: 'Point Man', actor: 'Joseph Gordon-Levitt', emoji: '🤵', color: '#1a1a0a', traits: ['Precise', 'Loyal', 'Cool'], detail: 'Arthur handles logistics and security. His hotel corridor fight — filmed with the camera rotating 360° — is one of cinema\'s most inventive action sequences.' },
+      { name: 'Eames', role: 'Forger', actor: 'Tom Hardy', emoji: '🎭', color: '#1a100a', traits: ['Charming', 'Adaptable', 'Witty'], detail: 'A shapeshifter who can impersonate anyone in a dream. Eames provides the film\'s lightness and the team\'s playful wit.' },
+    ],
+    themes: [
+      { icon: '💭', name: 'Reality vs. Perception', quote: '"What is the most resilient parasite? An idea."', desc: 'The film questions what makes reality "real." If your perception of reality is identical to a dream, does the distinction matter? Cobb\'s totem doesn\'t answer this — it\'s a psychological crutch, not objective proof.' },
+      { icon: '😔', name: 'Grief & Letting Go', quote: '"You\'re waiting for a train. A train that will take you far away."', desc: 'Beneath all the dream mechanics is a grief story. Cobb cannot move forward because he keeps Mal alive in his subconscious. The film is about the difficulty — and necessity — of letting the dead go.' },
+      { icon: '🌱', name: 'Creation & the Subconscious', quote: '"I can\'t imagine you with any other hair."', desc: 'Ariadne\'s role as architect mirrors the filmmaker\'s: constructing worlds that feel real and inhabitable. Nolan draws an explicit parallel between dream-building and cinema — both are shared illusions you consent to believe.' },
+    ],
+    why: [
+      { icon: '🏗️', title: 'A Film That Demands Your Attention', body: 'With five simultaneous timelines in the climax running at different speeds, Inception rewards total engagement and repeat viewings.' },
+      { icon: '🎵', title: 'Hans Zimmer\'s Score', body: '"Time" is one of cinema\'s most emotionally precise pieces of music. The score uses slowed recordings of Édith Piaf\'s "Non, je ne regrette rien" as a dream-time signal.' },
+      { icon: '🤔', title: 'The Ending Debate', body: 'Few films have generated more discussion per minute of screen time. The spinning top isn\'t a puzzle to solve — it\'s an invitation to examine why you need certainty.' },
+      { icon: '🎬', title: 'Practical Magic', body: 'The rotating hotel corridor was a real set built to spin. Paris folding in on itself used scale models and CGI together. The ambition is visible in every frame.' },
+    ],
+    mood: [
+      { label: 'Mind-Bending', value: 98, color: '#7c6af5' },
+      { label: 'Tension', value: 85, color: '#e85454' },
+      { label: 'Emotion', value: 70, color: '#4be87a' },
+      { label: 'Action', value: 65, color: '#e8b84b' },
+      { label: 'Humor', value: 22, color: '#4bb5e8' },
+    ],
+  },
+
+  {
+    id: 'parasite',
+    title: 'Parasite',
+    year: 2019,
+    director: 'Bong Joon-ho',
+    genre: 'Thriller / Drama',
+    genres: ['Thriller', 'Drama'],
+    runtime: '132 min',
+    rating: '8.5',
+    emoji: '🪲',
+    tagline: '"Act like you own the place."',
+    color1: '#1a0d0a',
+    color2: '#0a1a0d',
+    summary: 'The Kim family — all four unemployed — live in a cramped semi-basement apartment in Seoul. When son Ki-woo lands a tutoring job for the wealthy Park family, the Kims hatch an elaborate scheme to gradually replace the Park family\'s entire staff with themselves. What begins as sharp class satire transforms into something far darker and more violent.',
+    timeline: [
+      { act: 'Act I', title: 'The Kims Find a Crack', icon: '🪲', body: 'Ki-woo\'s friend Min-hyuk recommends him as an English tutor for Park Da-hye, daughter of the wealthy Park family. Ki-woo poses as a university student and wins the job.' },
+      { act: 'Act I', title: 'The Infiltration', icon: '🎭', body: 'Ki-woo refers his sister Ki-jung as an "art therapist," who gets his father Ki-taek hired as a driver by framing the previous driver. They then frame the housekeeper Moon-gwang to take her position for their mother. The Parks have no idea they\'ve hired a family.' },
+      { act: 'Act II', title: 'The Revelation', icon: '🚪', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">While the Parks vacation, the Kims luxuriate in the mansion. Moon-gwang returns — she\'s been hiding her husband Geun-sae in the mansion\'s hidden bunker for years, evading debt collectors. The Kims and Moon-gwang each have secrets that could destroy the other.</span>', spoiler: true },
+      { act: 'Act II', title: 'The Flood', icon: '🌧️', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Heavy rain floods the semi-basement Kim home while the Parks barely notice the storm. The contrast — mansion vs. flooded basement — is the film\'s sharpest image of class divide.</span>', spoiler: true },
+      { act: 'Act III', title: 'The Garden Party', icon: '🔪', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">At Da-song\'s birthday party, Geun-sae escapes the basement and kills Ki-jung. Ki-taek kills Mr. Park in a moment of class rage. Ki-taek vanishes into the bunker. The Kims\' scheme collapses into tragedy.</span>', spoiler: true },
+      { act: 'Epilogue', title: 'A Letter from Below', icon: '💌', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Ki-woo, in prison, receives a morse code message from his father — still hiding in the bunker years later. Ki-woo fantasizes about earning enough to buy the mansion and free him. The film ends on this fantasy: hopeful, impossible, and devastating.</span>', spoiler: true },
+    ],
+    characters: [
+      { name: 'Ki-taek (Father)', role: 'Anti-Hero', actor: 'Song Kang-ho', emoji: '🚗', color: '#1a0d0a', traits: ['Resourceful', 'Resigned', 'Explosive'], detail: 'A former failed businessman, Ki-taek has internalized his class position. His final act of violence is impulsive — not planned — born from a lifetime of watching the wealthy be obliviously cruel. He\'s the film\'s tragic heart.' },
+      { name: 'Ki-woo (Son)', role: 'Protagonist', actor: 'Choi Woo-shik', emoji: '📚', color: '#0a1a0d', traits: ['Clever', 'Ambitious', 'Naive'], detail: 'Ki-woo is talented enough to pass as a university student but locked out of the system that would legitimize him. His belief in "luck" and "stones" reveals his desire for magical thinking over structural change.' },
+      { name: 'Ki-jung (Sister)', role: 'Schemer', actor: 'Park So-dam', emoji: '🎨', color: '#1a1a0a', traits: ['Brilliant', 'Bold', 'Ruthless'], detail: 'The sharpest Kim — she forges documents, creates fake personas, and reads the Parks with clinical precision. Her death is the film\'s cruelest narrative move.' },
+      { name: 'Mr. Park', role: 'Oblivious Villain', actor: 'Lee Sun-kyun', emoji: '💼', color: '#0a0a1a', traits: ['Generous', 'Naive', 'Classist'], detail: 'Mr. Park isn\'t a cartoonish villain — he\'s generous, decent, even likable. His crimes are ones of obliviousness and the casual entitlement of the wealthy who "never cross the line." That is exactly what makes him so infuriating.' },
+    ],
+    themes: [
+      { icon: '📉', name: 'Class & Inequality', quote: '"You know what kind of plan never fails? No plan."', desc: 'Parasite maps Seoul\'s class geography vertically: the Parks live high on a hill in a glass mansion; the Kims live below ground. Every spatial choice is a class comment. Bong argues that class warfare isn\'t fought with ideology — it\'s lived in the smell of your clothes.' },
+      { icon: '🪲', name: 'Who Is the Parasite?', quote: '"Act like you own the place."', desc: 'The title\'s ambiguity is deliberate. Are the Kims parasites on the Parks? Or are the Parks parasites on exploited labor? Or is capitalism itself the parasite? The film refuses a clean answer.' },
+      { icon: '🗺️', name: 'Plans & Luck', quote: '"If you make a plan, life never works out that way."', desc: 'Ki-taek\'s philosophy — "no plan" — becomes darkly prophetic. The Kims\' meticulous con collapses because of variables outside their control. Bong suggests that in an unequal system, planning is a luxury only the secure can afford.' },
+    ],
+    why: [
+      { icon: '🏆', title: 'First Foreign Film to Win Best Picture', body: 'Parasite swept the 2020 Oscars, including Best Picture, Best Director, Best Original Screenplay, and Best International Feature — an unprecedented achievement.' },
+      { icon: '🎭', title: 'A Genre Shapeshifter', body: 'The film begins as dark comedy, becomes a tense thriller, and ends as tragedy. Each shift is earned — you never feel manipulated, even when the genre changes under your feet.' },
+      { icon: '🪟', title: 'The Architecture of Class', body: 'Every location, camera angle, and piece of production design carries meaning. The semi-basement window that looks at street-level feet. The mansion\'s flood-resistant high ground. Watch it twice.' },
+      { icon: '😂', title: 'Genuinely Funny', body: 'Despite its dark subject matter, Parasite is often hilarious. Bong\'s ability to draw dark comedy from class anxiety without letting it soften the critique is masterful.' },
+    ],
+    mood: [
+      { label: 'Tension', value: 90, color: '#e85454' },
+      { label: 'Darkness', value: 82, color: '#7c6af5' },
+      { label: 'Humor', value: 65, color: '#4bb5e8' },
+      { label: 'Emotion', value: 75, color: '#4be87a' },
+      { label: 'Action', value: 40, color: '#e8b84b' },
+    ],
+  },
+
+  {
+    id: 'godfather',
+    title: 'The Godfather',
+    year: 1972,
+    director: 'Francis Ford Coppola',
+    genre: 'Crime / Drama',
+    genres: ['Crime', 'Drama'],
+    runtime: '175 min',
+    rating: '9.2',
+    emoji: '🌹',
+    tagline: '"I\'m gonna make him an offer he can\'t refuse."',
+    color1: '#1a0a0a',
+    color2: '#0a0a0a',
+    summary: 'The aging patriarch of the Corleone crime family — Don Vito Corleone — transfers control of his empire to his youngest son Michael, who had refused involvement in organized crime. As a rival family\'s assassination attempt nearly kills Vito, Michael is drawn step by step into the world he swore to avoid, transforming from a war hero into the most powerful — and ruthless — Don of all.',
+    timeline: [
+      { act: 'Act I', title: 'The Don\'s World', icon: '🌹', body: 'Don Vito Corleone rules his crime family with a code of loyalty and measured violence. At his daughter\'s wedding, he grants favors. Michael Corleone, a decorated war veteran, attends with Kay — he is the one son who rejected the family business.' },
+      { act: 'Act I', title: 'The Refusal & the Attempt', icon: '🔫', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Virgil Sollozzo asks Vito to finance drug operations. Vito refuses — drugs are too messy for his political connections. Sollozzo\'s men shoot Vito in the street. He survives, barely.</span>', spoiler: true },
+      { act: 'Act II', title: 'Michael Enters the Game', icon: '🍴', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Michael volunteers to meet Sollozzo and Police Captain McCluskey at a restaurant under the guise of negotiation — then shoots them both. He flees to Sicily, where Vito recovers and eldest son Sonny runs the family recklessly.</span>', spoiler: true },
+      { act: 'Act II', title: 'The Cost of War', icon: '💥', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Sonny is ambushed and killed at a tollbooth. Vito negotiates peace. Michael returns from Sicily, marries Kay, and is groomed to take over. He is calm, methodical, the opposite of hot-headed Sonny.</span>', spoiler: true },
+      { act: 'Act III', title: 'Michael Becomes the Don', icon: '🪑', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Vito dies peacefully in his garden. At his godson\'s christening, Michael orders the simultaneous assassination of all rival family heads. The baptism intercut with murder is one of cinema\'s most iconic sequences.</span>', spoiler: true },
+      { act: 'Epilogue', title: 'Don Michael Corleone', icon: '🚪', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Kay realizes the man she married is gone. As Michael\'s men kiss his hand and call him "Don Corleone," Kay is shut outside the door. Michael\'s transformation is complete — and total.</span>', spoiler: true },
+    ],
+    characters: [
+      { name: 'Vito Corleone', role: 'Patriarch', actor: 'Marlon Brando', emoji: '🌹', color: '#1a0a0a', traits: ['Wise', 'Ruthless', 'Loving'], detail: 'One of cinema\'s great paradoxes — a murderer who is also a genuinely loving father, a man of honor in an inherently dishonorable world. Brando\'s cotton-stuffed cheeks, mumbled voice, and precise physicality created an archetype that still defines the gangster patriarch.' },
+      { name: 'Michael Corleone', role: 'Tragic Hero', actor: 'Al Pacino', emoji: '🕶️', color: '#0a0a1a', traits: ['Controlled', 'Strategic', 'Cold'], detail: 'Michael\'s transformation is the film\'s tragedy. He begins as the idealistic outsider — the "civilian" Corleone — and ends as the most ruthless Don of all. His coldness isn\'t villainy; it\'s the film\'s argument that power inevitably corrupts even the most principled.' },
+      { name: 'Tom Hagen', role: 'Consigliere', actor: 'Robert Duvall', emoji: '⚖️', color: '#0a1a0a', traits: ['Diplomatic', 'Loyal', 'Measured'], detail: 'Adopted by the Corleones, Tom is their lawyer and adviser. He\'s a "wartime consigliere" who doesn\'t fully belong — his German-Irish roots keep him perpetually outside the inner circle despite total loyalty.' },
+      { name: 'Sonny Corleone', role: 'Hothead', actor: 'James Caan', emoji: '💢', color: '#1a0a00', traits: ['Passionate', 'Violent', 'Impulsive'], detail: 'Sonny\'s rage is his gift and his death. He fights passionately for the family but cannot control his emotions — a fatal flaw in a world where control is survival.' },
+    ],
+    themes: [
+      { icon: '👨‍👩‍👧‍👦', name: 'Family & Loyalty', quote: '"A man who doesn\'t spend time with his family can never be a real man."', desc: 'The Corleones\' bond is genuine — Vito\'s love for his children is unambiguous. But loyalty to family requires acts of violence against others. Coppola forces us to admire a family we should condemn.' },
+      { icon: '💼', name: 'The American Dream as Crime', quote: '"What have I ever done to make you treat me so disrespectfully?"', desc: 'The Corleones are immigrants who built their own version of the American Dream — by the same ruthless logic as legitimate capitalism. Coppola suggests the line between organized crime and organized business is thinner than society admits.' },
+      { icon: '🪑', name: 'Power & Corruption', quote: '"Keep your friends close, but your enemies closer."', desc: 'Michael doesn\'t want power — until he needs it. Then power reshapes him. The Godfather argues that holding power long enough always changes the person holding it, regardless of original intent.' },
+    ],
+    why: [
+      { icon: '🏆', title: 'The Greatest Film Ever Made?', body: 'Consistently rated #1 or #2 on every major "greatest films" list. Nearly every element — performance, score, cinematography, screenplay — is among cinema\'s finest.' },
+      { icon: '🎵', title: 'Nino Rota\'s Score', body: 'The Godfather theme is instantly recognizable worldwide. It\'s plaintive, beautiful, and utterly wrong for a crime film — which makes it perfect for a story about family corrupted by power.' },
+      { icon: '📸', title: 'Gordon Willis\'s Darkness', body: 'Cinematographer Gordon Willis was called "The Prince of Darkness" for making interior scenes so dark Vito\'s eyes are often invisible. This was revolutionary — and controversial.' },
+      { icon: '🌍', title: 'Cultural Footprint', body: 'Every gangster film, TV show, and political drama since 1972 has been in conversation with The Godfather. It invented a visual and moral language that cinema still uses.' },
+    ],
+    mood: [
+      { label: 'Drama', value: 95, color: '#7c6af5' },
+      { label: 'Tension', value: 80, color: '#e85454' },
+      { label: 'Darkness', value: 75, color: '#4bb5e8' },
+      { label: 'Emotion', value: 88, color: '#4be87a' },
+      { label: 'Action', value: 35, color: '#e8b84b' },
+    ],
+  },
+
+  {
+    id: 'shawshank',
+    title: 'The Shawshank Redemption',
+    year: 1994,
+    director: 'Frank Darabont',
+    genre: 'Drama',
+    genres: ['Drama'],
+    runtime: '142 min',
+    rating: '9.3',
+    emoji: '🕊️',
+    tagline: '"Fear can hold you prisoner. Hope can set you free."',
+    color1: '#0a1428',
+    color2: '#141a0a',
+    summary: 'Andy Dufresne, a banker wrongly convicted of his wife\'s murder, arrives at Shawshank State Penitentiary in 1947. Over two decades, his quiet dignity, intelligence, and refusal to surrender his inner freedom changes the lives of everyone around him — most importantly Ellis "Red" Redding, a long-serving inmate who has forgotten what hope feels like.',
+    timeline: [
+      { act: 'Arrival', title: 'Shawshank Swallows Andy', icon: '🏛️', body: 'Andy arrives quiet, reserved — obviously out of place. Red bets he\'ll cry first night. He doesn\'t. Warden Norton and Captain Hadley run a prison of corruption and brutality. Andy is assigned to the laundry.' },
+      { act: 'Survival', title: 'Finding His Place', icon: '📚', body: 'Andy leverages his financial expertise to help guards with tax returns, eventually managing the warden\'s corrupt money-laundering. He expands the prison library over 20 years, tutoring inmates, creating a small island of dignity.' },
+      { act: 'Hope', title: 'Mozart & the Speakers', icon: '🎵', body: 'Andy locks himself in the warden\'s office and broadcasts Mozart over the prison PA system. The entire prison falls silent. Red narrates: "I have no idea to this day what those two Italian ladies were singing about... I like to think they were singing about something so beautiful it can\'t be expressed in words."' },
+      { act: 'Crisis', title: 'Tommy\'s Testimony', icon: '💔', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Tommy Williams claims to know the real killer — proof of Andy\'s innocence. Warden Norton, not wanting to lose his financial genius, has Tommy murdered and throws Andy in solitary for a month.</span>', spoiler: true },
+      { act: 'Escape', title: 'The Tunnel', icon: '🕳️', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Andy escapes through a tunnel he spent 19 years digging behind a Rita Hayworth poster. He crawls through "500 yards of the foulest-smelling foulness imaginable." He\'s left evidence of the warden\'s corruption for the press. He emerges into rain, arms wide.</span>', spoiler: true },
+      { act: 'Redemption', title: 'Zihuatanejo', icon: '🌊', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">The warden kills himself. Andy is free in Mexico. Red is finally paroled and, defying institutionalization, follows Andy\'s instructions to Buxton — where a letter and money wait. He reaches the Pacific. "I hope."</span>', spoiler: true },
+    ],
+    characters: [
+      { name: 'Andy Dufresne', role: 'Protagonist', actor: 'Tim Robbins', emoji: '🕊️', color: '#0a1428', traits: ['Dignified', 'Patient', 'Hopeful'], detail: 'Andy is the film\'s quiet miracle. He survives 20 years of brutal injustice without becoming bitter. His secret is not optimism but agency — he always has a plan, a project, a thing to do. He refuses to let the institution become his identity.' },
+      { name: 'Ellis "Red" Redding', role: 'Narrator / Heart', actor: 'Morgan Freeman', emoji: '🎸', color: '#141a0a', traits: ['Wise', 'Resigned', 'Redeemed'], detail: 'Red is the film\'s real protagonist — a man who has "institutionalized" himself to survive, who has traded hope for acceptance. Andy\'s friendship slowly reawakens something in him. Red\'s parole board answers evolve across decades from defeated to authentic.' },
+      { name: 'Warden Norton', role: 'Antagonist', actor: 'Bob Gunton', emoji: '📖', color: '#1a0a0a', traits: ['Hypocritical', 'Powerful', 'Corrupt'], detail: 'Norton weaponizes religion and respectability. He\'s more frightening than an overtly cruel villain because he genuinely believes his corruption is justified. "His judgment cometh and that right soon."' },
+    ],
+    themes: [
+      { icon: '🕊️', name: 'Hope as Resistance', quote: '"Hope is a good thing, maybe the best of things."', desc: 'Red calls hope "a dangerous thing." Andy says it\'s the only thing that keeps you sane. The film sides with Andy — but earns that optimism by making us watch 20 years of suffering first.' },
+      { icon: '🏛️', name: 'Institutionalization', quote: '"These walls are funny. First you hate \'em, then you get used to \'em."', desc: 'Red\'s journey from resigned acceptance to terrified freedom explores how systems grind down the human spirit. Brooks Hatlen\'s storyline — freed after 50 years, unable to survive outside — is the film\'s darkest chapter.' },
+      { icon: '🤝', name: 'Friendship Across Despair', quote: '"Get busy living, or get busy dying."', desc: 'The Andy-Red friendship is the film\'s emotional core. Their bond — across race, personality, and history — is the film\'s argument that genuine human connection survives even the most dehumanizing conditions.' },
+    ],
+    why: [
+      { icon: '💧', title: 'The Most Rewatched Film', body: 'Despite being a box office disappointment on release, Shawshank is IMDB\'s #1 rated film and one of the most-watched films in TV broadcast history — discovered and loved by millions on cable.' },
+      { icon: '🎙️', title: 'Morgan Freeman\'s Voice', body: 'Red\'s narration is cinematic literature. Darabont adapted Stephen King\'s novella and trusted Freeman\'s voice to carry the film\'s soul through its quietest and most devastating moments.' },
+      { icon: '🌧️', title: 'The Rain Scene', body: 'Andy emerging from the sewage pipe, arms raised in the rain — perhaps cinema\'s most iconic image of freedom. It earns every second of its emotional release.' },
+      { icon: '❤️', title: 'Earned Hope', body: 'Most films about hope give it cheaply. Shawshank makes you wait, makes you suffer, makes you believe Red is right — then gives you Zihuatanejo. It\'s the most generous ending in cinema.' },
+    ],
+    mood: [
+      { label: 'Emotion', value: 98, color: '#4be87a' },
+      { label: 'Hope', value: 90, color: '#e8b84b' },
+      { label: 'Darkness', value: 72, color: '#7c6af5' },
+      { label: 'Tension', value: 55, color: '#e85454' },
+      { label: 'Action', value: 10, color: '#4bb5e8' },
+    ],
+  },
+
+  {
+    id: 'pulp-fiction',
+    title: 'Pulp Fiction',
+    year: 1994,
+    director: 'Quentin Tarantino',
+    genre: 'Crime / Drama',
+    genres: ['Crime', 'Drama'],
+    runtime: '154 min',
+    rating: '8.9',
+    emoji: '💼',
+    tagline: '"Just because you are a character doesn\'t mean you have character."',
+    color1: '#1a1000',
+    color2: '#0a0a1a',
+    summary: 'Several interconnected stories of Los Angeles criminals, low-level hitmen, a boxer who refuses to throw a fight, and a crime boss\'s wife unfold in a non-linear structure. Tarantino\'s dialogue-driven masterpiece revived independent cinema in the 1990s and redefined what genre film could be.',
+    timeline: [
+      { act: 'Prologue', title: 'Pumpkin & Honey Bunny', icon: '☕', body: 'A couple in a diner — Pumpkin and Honey Bunny — decide impulsively to rob it. The film opens and closes with this scene, but shows us different perspectives each time.' },
+      { act: 'Story 1', title: 'Vincent Vega & Marsellus Wallace\'s Wife', icon: '💃', body: 'Hitman Vincent Vega is tasked with entertaining his boss Marsellus\'s wife Mia Wallace. Their date at Jack Rabbit Slim\'s and the Twist contest are the film\'s most charming sequence. <span class="spoiler-text" onclick="revealSpoiler(this)">Mia accidentally overdoses on heroin; Vincent plunges adrenaline into her chest.</span>', spoiler: true },
+      { act: 'Story 2', title: 'The Gold Watch', icon: '⌚', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Boxer Butch Coolidge refuses to throw a fight for Marsellus and accidentally kills his opponent. He retrieves his late father\'s heirloom watch, encounters Vincent (and kills him), then rescues Marsellus from a truly horrifying situation. They part with a mutual understanding — and Butch flees to freedom.</span>', spoiler: true },
+      { act: 'Story 3', title: 'The Bonnie Situation', icon: '🧹', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Jules and Vincent accidentally kill Marvin (a bullet to the face in the car). They call their fixer Winston Wolfe to clean up before Jules\'s partner Jimmie\'s wife gets home. Jules experiences what he calls "divine intervention" after miraculously surviving a gunfight — and announces he\'s retiring.</span>', spoiler: true },
+      { act: 'Epilogue', title: 'The Diner, Revisited', icon: '🔫', body: '<span class="spoiler-text" onclick="revealSpoiler(this)">Back to the diner — now from Jules\'s perspective. He and Vincent are held up by Pumpkin and Honey Bunny. Jules, in his moment of epiphany, lets them go — quoting Ezekiel 25:17. He\'s choosing a different life than Vincent, who will be dead by afternoon.</span>', spoiler: true },
+    ],
+    characters: [
+      { name: 'Jules Winnfield', role: 'Hitman / Philosopher', actor: 'Samuel L. Jackson', emoji: '📖', color: '#0a0a1a', traits: ['Intense', 'Philosophical', 'Reformed'], detail: 'Jules is the film\'s moral center — a hitman who quotes scripture as ritual, then as genuine reckoning. His "moment of clarity" after surviving an impossible situation drives the film\'s thematic conclusion: even in the most degraded world, people can choose something different.' },
+      { name: 'Vincent Vega', role: 'Hitman', actor: 'John Travolta', emoji: '💉', color: '#1a1000', traits: ['Casual', 'Philosophical', 'Careless'], detail: 'Vincent is charming, verbose, and doomed by his own laziness. He keeps making the same mistake — leaving his gun unattended — until it kills him. His death, offscreen and undramatic, is Tarantino\'s darkest joke.' },
+      { name: 'Mia Wallace', role: 'Crime Boss\'s Wife', actor: 'Uma Thurman', emoji: '💄', color: '#1a001a', traits: ['Magnetic', 'Dangerous', 'Vulnerable'], detail: 'Mia carries a mythology (the rumor about what happened to Marsellus\'s foot-massager) that the film wisely never confirms. Her presence electrifies every scene she\'s in.' },
+      { name: 'Butch Coolidge', role: 'Boxer', actor: 'Bruce Willis', emoji: '⌚', color: '#1a0a0a', traits: ['Principled', 'Brutal', 'Unexpected'], detail: 'Butch is the film\'s most straightforwardly moral character — he risks everything to retrieve an heirloom, then risks it again to rescue the man trying to kill him. Tarantino uses him to show that honor exists even among criminals.' },
+    ],
+    themes: [
+      { icon: '🌀', name: 'Non-Linear Time & Consequence', quote: '"Uncomfortable silences. Why do we feel it\'s necessary to yak about bullsh*t?"', desc: 'Tarantino shows us Vincent alive after we\'ve seen him dead. By scrambling chronology, he argues that narrative causality is a fiction — and that character matters more than plot.' },
+      { icon: '🗣️', name: 'Dialogue as Revelation', quote: '"Royale with Cheese."', desc: 'The conversations in Pulp Fiction — about foot massages, burgers, TV pilots — aren\'t filler. They reveal character so precisely that when violence erupts, it lands differently because we know these people.' },
+      { icon: '🔄', name: 'Redemption in a Broken World', quote: '"The path of the righteous man is beset on all sides."', desc: 'Jules\'s arc is the film\'s thesis: even in a world of pure amorality, individual choices toward redemption are possible and meaningful — even if the world doesn\'t reward them.' },
+    ],
+    why: [
+      { icon: '🎬', title: 'Revived Independent Cinema', body: 'Pulp Fiction\'s 1994 Palme d\'Or win and $200M worldwide gross (on a $8M budget) proved that dialogue-driven, non-linear genre films could be mainstream hits.' },
+      { icon: '🗣️', title: 'The Greatest Dialogue in Cinema', body: 'Every conversation is quotable. Tarantino\'s ear for rhythm, pop-culture specificity, and character voice is unmatched in American cinema.' },
+      { icon: '🎵', title: 'The Soundtrack', body: 'Tarantino curated rather than scored — surf rock, soul, and pop create a timeless 1950s-meets-1990s atmosphere that nobody has successfully imitated.' },
+      { icon: '🔀', title: 'The Structure', body: 'Watch it twice knowing the chronology. The film feels completely different — and even richer — when you understand the time sequence.' },
+    ],
+    mood: [
+      { label: 'Cool Factor', value: 98, color: '#e8b84b' },
+      { label: 'Tension', value: 78, color: '#e85454' },
+      { label: 'Humor', value: 85, color: '#4bb5e8' },
+      { label: 'Darkness', value: 70, color: '#7c6af5' },
+      { label: 'Emotion', value: 55, color: '#4be87a' },
+    ],
+  },
+];
+
+// ─────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────
+let currentMovie = null;
+let activeTab = 'plot';
+let spoilersOn = false;
+let activeGenre = 'all';
+let searchQuery = '';
+
+// ─────────────────────────────────────────────
+//  Sidebar rendering
+// ─────────────────────────────────────────────
+function getFilteredMovies() {
+  return MOVIES.filter(m => {
+    const matchGenre = activeGenre === 'all' || m.genres.includes(activeGenre);
+    const matchSearch = !searchQuery || m.title.toLowerCase().includes(searchQuery.toLowerCase()) || m.director.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchGenre && matchSearch;
+  });
+}
+
+const POSTER_COLORS = [
+  ['#1a1a2e', '#16213e'], ['#0d1a2a', '#1a2a1a'],
+  ['#1a0d0a', '#0a1a0d'], ['#1a0a0a', '#0a0a0a'],
+  ['#0a1428', '#141a0a'], ['#1a1000', '#0a0a1a'],
+];
+
+function renderSidebar() {
+  const list = document.getElementById('movie-list');
+  const movies = getFilteredMovies();
+  list.innerHTML = '';
+
+  if (!movies.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.82rem;">No movies found</div>';
+    return;
+  }
+
+  movies.forEach((m, i) => {
+    const card = document.createElement('div');
+    card.className = 'movie-card' + (currentMovie?.id === m.id ? ' active' : '');
+    card.innerHTML = `
+      <div class="movie-poster-thumb" style="background:linear-gradient(135deg,${POSTER_COLORS[i % POSTER_COLORS.length][0]},${POSTER_COLORS[i % POSTER_COLORS.length][1]})">
+        <span>${m.emoji}</span>
+      </div>
+      <div class="movie-card-info">
+        <div class="movie-card-title">${m.title}</div>
+        <div class="movie-card-meta">${m.year} · ${m.director}</div>
+      </div>
+      <div class="movie-card-rating">★ ${m.rating}</div>
+    `;
+    card.addEventListener('click', () => selectMovie(m));
+    list.appendChild(card);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Movie selection
+// ─────────────────────────────────────────────
+function selectMovie(movie) {
+  currentMovie = movie;
+  spoilersOn = false;
+  document.body.classList.remove('spoilers-on');
+
+  // Show movie view
+  document.getElementById('empty-state').style.display = 'none';
+  const view = document.getElementById('movie-view');
+  view.style.display = 'flex';
+
+  // Switch to plot tab
+  switchTab('plot');
+
+  // Animate hero
+  const content = document.getElementById('hero-content');
+  content.classList.add('transitioning');
+  setTimeout(() => {
+    renderHero(movie);
+    renderPlot(movie);
+    renderCharacters(movie);
+    renderThemes(movie);
+    renderWhy(movie);
+    content.classList.remove('transitioning');
+  }, 200);
+
+  renderSidebar();
+
+  // Scroll main to top
+  document.getElementById('main').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderHero(m) {
+  document.getElementById('hero-bg').style.background = `linear-gradient(135deg, ${m.color1}, ${m.color2})`;
+  document.getElementById('movie-emoji').textContent = m.emoji;
+  document.getElementById('movie-title').textContent = m.title;
+  document.getElementById('movie-tagline').textContent = m.tagline;
+  document.getElementById('badge-rating').textContent = '★ ' + m.rating;
+  document.getElementById('badge-year').textContent = m.year;
+  document.getElementById('badge-director').textContent = 'Dir. ' + m.director;
+  document.getElementById('badge-genre').textContent = m.genre;
+  document.getElementById('badge-runtime').textContent = m.runtime;
+  updateSpoilerButton();
+}
+
+// ─────────────────────────────────────────────
+//  Plot Tab
+// ─────────────────────────────────────────────
+function renderPlot(m) {
+  document.getElementById('plot-summary').textContent = m.summary;
+
+  const tl = document.getElementById('timeline');
+  tl.innerHTML = '';
+
+  m.timeline.forEach((item, i) => {
+    const el = document.createElement('div');
+    el.className = 'timeline-item';
+    el.innerHTML = `
+      <div class="timeline-left">
+        <div class="timeline-dot"></div>
+        <div class="timeline-line"></div>
+      </div>
+      <div class="timeline-content">
+        <div class="timeline-act">${item.act}</div>
+        <div class="timeline-heading">
+          <span>${item.icon}</span>
+          <span>${item.title}</span>
+          <span class="timeline-expand-icon">▾</span>
+        </div>
+        <div class="timeline-body">${item.body}</div>
+      </div>
+    `;
+    el.querySelector('.timeline-heading').addEventListener('click', () => {
+      const wasOpen = el.classList.contains('open');
+      tl.querySelectorAll('.timeline-item').forEach(e => e.classList.remove('open'));
+      tl.querySelectorAll('.timeline-dot').forEach(d => {
+        d.style.background = 'var(--surface2)';
+        d.style.borderColor = 'var(--border)';
+      });
+      if (!wasOpen) {
+        el.classList.add('open');
+        el.querySelector('.timeline-dot').style.background = 'var(--accent)';
+        el.querySelector('.timeline-dot').style.borderColor = 'var(--accent)';
+      }
+    });
+    tl.appendChild(el);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Characters Tab
+// ─────────────────────────────────────────────
+function renderCharacters(m) {
+  const grid = document.getElementById('characters-grid');
+  grid.innerHTML = '';
+
+  m.characters.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'char-card';
+    const traits = c.traits.map(t => `<span class="char-trait">${t}</span>`).join('');
+    card.innerHTML = `
+      <div class="char-avatar" style="background:linear-gradient(135deg,${c.color},#1a1a2e)">
+        ${c.emoji}
+      </div>
+      <div class="char-name">${c.name}</div>
+      <div class="char-role">${c.role}</div>
+      <div class="char-actor">Played by ${c.actor}</div>
+      <div class="char-detail">
+        ${c.detail}
+        <div style="margin-top:8px">${traits}</div>
+      </div>
+    `;
+    card.addEventListener('click', () => {
+      const wasExp = card.classList.contains('expanded');
+      grid.querySelectorAll('.char-card').forEach(cc => cc.classList.remove('expanded'));
+      if (!wasExp) card.classList.add('expanded');
+    });
+    grid.appendChild(card);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Themes Tab
+// ─────────────────────────────────────────────
+function renderThemes(m) {
+  const list = document.getElementById('themes-list');
+  list.innerHTML = '';
+
+  m.themes.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'theme-card';
+    el.innerHTML = `
+      <div class="theme-icon">${t.icon}</div>
+      <div class="theme-content">
+        <div class="theme-name">${t.name}</div>
+        <div class="theme-desc">${t.desc}</div>
+        <div class="theme-quote">${t.quote}</div>
+      </div>
+    `;
+    list.appendChild(el);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Why Watch Tab
+// ─────────────────────────────────────────────
+function renderWhy(m) {
+  const grid = document.getElementById('why-grid');
+  grid.innerHTML = '';
+  m.why.forEach(w => {
+    const el = document.createElement('div');
+    el.className = 'why-card';
+    el.innerHTML = `
+      <div class="why-card-icon">${w.icon}</div>
+      <div class="why-card-title">${w.title}</div>
+      <div class="why-card-body">${w.body}</div>
+    `;
+    grid.appendChild(el);
+  });
+
+  const bars = document.getElementById('mood-bars');
+  bars.innerHTML = '';
+  m.mood.forEach(mood => {
+    const row = document.createElement('div');
+    row.className = 'mood-bar-row';
+    row.innerHTML = `
+      <div class="mood-label">${mood.label}</div>
+      <div class="mood-track"><div class="mood-fill" style="width:0%;background:${mood.color}" data-target="${mood.value}"></div></div>
+      <div class="mood-val">${mood.value}%</div>
+    `;
+    bars.appendChild(row);
+  });
+
+  // Animate bars when tab becomes active
+  setTimeout(() => {
+    if (activeTab === 'why') animateMoodBars();
+  }, 100);
+}
+
+function animateMoodBars() {
+  document.querySelectorAll('.mood-fill').forEach(bar => {
+    bar.style.width = bar.dataset.target + '%';
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Tabs
+// ─────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'why') setTimeout(animateMoodBars, 50);
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ─────────────────────────────────────────────
+//  Spoilers
+// ─────────────────────────────────────────────
+function updateSpoilerButton() {
+  const btn = document.getElementById('spoiler-toggle');
+  if (spoilersOn) {
+    btn.textContent = '🔓 Spoilers On';
+    btn.classList.add('revealed');
+  } else {
+    btn.textContent = '🔒 Spoilers Off';
+    btn.classList.remove('revealed');
+  }
+}
+
+document.getElementById('spoiler-toggle').addEventListener('click', () => {
+  spoilersOn = !spoilersOn;
+  if (spoilersOn) {
+    document.body.classList.add('spoilers-on');
+  } else {
+    document.body.classList.remove('spoilers-on');
+    document.querySelectorAll('.spoiler-text').forEach(el => el.classList.remove('revealed'));
+  }
+  updateSpoilerButton();
+});
+
+window.revealSpoiler = function(el) {
+  el.classList.add('revealed');
+};
+
+// ─────────────────────────────────────────────
+//  Genre Filters
+// ─────────────────────────────────────────────
+document.querySelectorAll('.genre-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.genre-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeGenre = chip.dataset.genre;
+    renderSidebar();
+  });
+});
+
+// ─────────────────────────────────────────────
+//  Search
+// ─────────────────────────────────────────────
+document.getElementById('search-input').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  renderSidebar();
+});
+
+// ─────────────────────────────────────────────
+//  Init
+// ─────────────────────────────────────────────
+renderSidebar();
+</script>
+</body>
+</html>
